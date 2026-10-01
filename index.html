@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>在 Claude Code 里使用 DeepSeek API · 完整使用说明</title>
+<style>
+  :root {
+    --bg: #fbfaf8;
+    --card: #ffffff;
+    --text: #1a1918;
+    --sub: #5e5d59;
+    --faint: #8a8880;
+    --line: #e5e2db;
+    --accent: #d97757;
+    --accent-soft: rgba(217, 119, 87, 0.10);
+    --code-bg: #f5f4ef;
+    --ok: #2f7d5d;
+    --warn: #a8631c;
+    --warn-bg: rgba(168, 99, 28, 0.08);
+    --warn-line: rgba(168, 99, 28, 0.28);
+    --radius: 10px;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16181c;
+      --card: #1d2025;
+      --text: #e8e6e1;
+      --sub: #a8a59e;
+      --faint: #7c7972;
+      --line: #2e3238;
+      --accent: #e08f6f;
+      --accent-soft: rgba(224, 143, 111, 0.14);
+      --code-bg: #24282e;
+      --ok: #5fbd91;
+      --warn: #e0a865;
+      --warn-bg: rgba(224, 168, 101, 0.10);
+      --warn-line: rgba(224, 168, 101, 0.30);
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.75;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 860px; margin: 0 auto; padding: 0 24px 120px; }
+
+  /* ---------- Header ---------- */
+  header { padding: 64px 0 32px; }
+  header .eyebrow {
+    font-size: 13px; font-weight: 600; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--accent); margin-bottom: 12px;
+  }
+  header h1 { font-size: 34px; line-height: 1.25; margin: 0 0 16px; letter-spacing: -0.02em; }
+  header p { color: var(--sub); margin: 0; max-width: 62ch; }
+
+  /* ---------- Tab bar ---------- */
+  .tabbar {
+    position: sticky; top: 0; z-index: 10;
+    display: flex; gap: 4px; align-items: center;
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: blur(12px);
+    padding: 12px 0; margin: 0 0 28px;
+    border-bottom: 1px solid var(--line);
+  }
+  .tabbar .label {
+    font-size: 13px; color: var(--faint); margin-right: 12px; white-space: nowrap;
+  }
+  .tab {
+    appearance: none; border: 1px solid transparent; cursor: pointer;
+    font-family: inherit; font-size: 14px; font-weight: 500;
+    padding: 7px 16px; border-radius: 999px;
+    background: transparent; color: var(--sub);
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+  .tab:hover { background: var(--accent-soft); color: var(--text); }
+  .tab[aria-selected="true"] {
+    background: var(--accent); border-color: var(--accent);
+    color: #fff; font-weight: 600;
+  }
+  .tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* ---------- Panels ---------- */
+  .panel { display: none; }
+  .panel.active { display: block; animation: fade 0.22s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) {
+    .panel.active { animation: none; }
+    html { scroll-behavior: auto; }
+  }
+
+  /* ---------- Sections ---------- */
+  section { margin: 0 0 44px; }
+  h2 {
+    font-size: 22px; margin: 40px 0 16px; letter-spacing: -0.01em;
+    display: flex; align-items: center; gap: 12px;
+  }
+  h2 .num {
+    flex: none; width: 30px; height: 30px; border-radius: 50%;
+    background: var(--accent-soft); color: var(--accent);
+    display: grid; place-items: center; font-size: 15px; font-weight: 700;
+  }
+  h3 { font-size: 16px; margin: 28px 0 10px; color: var(--text); }
+  p { margin: 0 0 14px; }
+  ul, ol { margin: 0 0 16px; padding-left: 22px; }
+  li { margin-bottom: 7px; }
+  a { color: var(--accent); text-underline-offset: 3px; }
+  strong { font-weight: 650; }
+
+  /* ---------- Cards ---------- */
+  .card {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 22px 24px; margin: 0 0 20px;
+  }
+
+  /* ---------- Code ---------- */
+  .code {
+    position: relative; background: var(--code-bg);
+    border: 1px solid var(--line); border-radius: var(--radius);
+    margin: 0 0 16px;
+  }
+  .code pre {
+    margin: 0; padding: 16px 18px; overflow-x: auto;
+    font-family: var(--mono); font-size: 13.5px; line-height: 1.65;
+    color: var(--text);
+  }
+  .code .copy {
+    position: absolute; top: 8px; right: 8px;
+    appearance: none; cursor: pointer; font-family: inherit;
+    font-size: 12px; padding: 4px 10px; border-radius: 6px;
+    border: 1px solid var(--line); background: var(--card); color: var(--sub);
+    opacity: 0; transition: opacity 0.15s, color 0.15s;
+  }
+  .code:hover .copy, .code:focus-within .copy { opacity: 1; }
+  .code .copy:hover { color: var(--accent); border-color: var(--accent); }
+  .code .copy.done { color: var(--ok); border-color: var(--ok); opacity: 1; }
+  @media (hover: none) { .code .copy { opacity: 1; } }
+
+  code {
+    font-family: var(--mono); font-size: 0.88em;
+    background: var(--code-bg); padding: 2px 6px; border-radius: 5px;
+    border: 1px solid var(--line);
+  }
+  .code pre code { background: none; border: none; padding: 0; font-size: inherit; }
+
+  /* ---------- Table ---------- */
+  .table-scroll { overflow-x: auto; margin: 0 0 18px; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-weight: 600; color: var(--sub); font-size: 13px; white-space: nowrap; }
+  tbody tr:last-child td { border-bottom: none; }
+  td code { white-space: nowrap; }
+
+  /* ---------- Callouts ---------- */
+  .note {
+    border-left: 3px solid var(--accent); background: var(--accent-soft);
+    padding: 14px 18px; border-radius: 0 var(--radius) var(--radius) 0;
+    margin: 0 0 18px; font-size: 14.5px;
+  }
+  .note.warn {
+    border-left-color: var(--warn); background: var(--warn-bg);
+  }
+  .note p:last-child { margin-bottom: 0; }
+  .note .tag { font-weight: 650; }
+
+  /* ---------- Precedence chain ---------- */
+  .chain { display: flex; flex-direction: column; gap: 6px; margin: 0 0 18px; }
+  .chain .row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 14px; border: 1px solid var(--line);
+    border-radius: 8px; background: var(--card); font-size: 14px;
+  }
+  .chain .row.top { border-color: var(--accent); background: var(--accent-soft); }
+  .chain .rank {
+    flex: none; width: 22px; height: 22px; border-radius: 50%;
+    background: var(--code-bg); color: var(--sub);
+    display: grid; place-items: center; font-size: 12px; font-weight: 700;
+  }
+  .chain .row.top .rank { background: var(--accent); color: #fff; }
+  .chain .f { font-family: var(--mono); font-size: 13px; flex: 1; overflow-wrap: anywhere; }
+  .chain .scope { color: var(--faint); font-size: 12.5px; white-space: nowrap; }
+
+  /* ---------- FAQ ---------- */
+  details.faq {
+    border: 1px solid var(--line); border-radius: var(--radius);
+    background: var(--card); margin: 0 0 10px; overflow: hidden;
+  }
+  details.faq summary {
+    cursor: pointer; padding: 14px 18px; font-weight: 600; font-size: 15px;
+    list-style: none; display: flex; align-items: center; gap: 10px;
+  }
+  details.faq summary::-webkit-details-marker { display: none; }
+  details.faq summary::before {
+    content: "+"; flex: none; width: 18px; color: var(--accent);
+    font-weight: 700; font-size: 17px; line-height: 1;
+  }
+  details.faq[open] summary::before { content: "–"; }
+  details.faq summary:hover { color: var(--accent); }
+  details.faq .body { padding: 0 18px 16px 46px; color: var(--sub); font-size: 14.5px; }
+  details.faq .body p:last-child, details.faq .body ul:last-child { margin-bottom: 0; }
+
+  kbd {
+    font-family: var(--mono); font-size: 0.82em;
+    border: 1px solid var(--line); border-bottom-width: 2px;
+    border-radius: 5px; padding: 1px 6px; background: var(--code-bg);
+  }
+
+  footer {
+    margin-top: 64px; padding-top: 24px; border-top: 1px solid var(--line);
+    font-size: 14px; color: var(--faint);
+  }
+  footer ul { list-style: none; padding: 0; }
+  footer li { margin-bottom: 6px; }
+
+  @media (max-width: 600px) {
+    header { padding: 40px 0 24px; }
+    header h1 { font-size: 26px; }
+    .wrap { padding: 0 18px 80px; }
+    .tabbar .label { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">claude-code-deepseek</div>
+    <h1>在 Claude Code 里使用 DeepSeek API</h1>
+    <p>从注册账号、充值，到把配置文件放进正确的目录、跑通第一次对话。下面按操作系统分栏，先选你的系统，全站步骤会自动跟着切换。</p>
+  </header>
+
+  <div class="tabbar" role="tablist" aria-label="选择操作系统">
+    <span class="label">操作系统</span>
+    <button class="tab" role="tab" id="tab-mac" aria-controls="panel-mac" aria-selected="true">macOS</button>
+    <button class="tab" role="tab" id="tab-win" aria-controls="panel-win" aria-selected="false">Windows</button>
+    <button class="tab" role="tab" id="tab-linux" aria-controls="panel-linux" aria-selected="false">Linux / WSL</button>
+  </div>
+
+  <!-- ================= macOS ================= -->
+  <div class="panel active" id="panel-mac" role="tabpanel" aria-labelledby="tab-mac">
+
+    <section>
+      <h2><span class="num">0</span>安装 Claude Code</h2>
+      <p>需要 Node.js 18 或更高版本。推荐用官方安装脚本：</p>
+      <div class="code"><button class="copy">复制</button><pre><code>curl -fsSL https://claude.ai/install.sh | bash</code></pre></div>
+      <p>或者用 npm 全局安装：</p>
+      <div class="code"><button class="copy">复制</button><pre><code>npm install -g @anthropic-ai/claude-code</code></pre></div>
+      <p>验证是否装好：</p>
+      <div class="code"><button class="copy">复制</button><pre><code>claude --version</code></pre></div>
+    </section>
+
+    <section>
+      <h2><span class="num">4</span>把配置放到正确的目录</h2>
+      <p>这是最容易出错的一步。Claude Code 会从<b>多个位置</b>读取 <code>settings.json</code>，放错地方就会出现「明明配了却不生效」。</p>
+
+      <h3>有效的路径有哪些</h3>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>位置</th><th>macOS 路径</th><th>生效范围</th></tr></thead>
+          <tbody>
+            <tr><td>用户级 ⭐</td><td><code>~/.claude/settings.json</code></td><td>这台机器上你的<b>所有项目</b></td></tr>
+            <tr><td>项目共享</td><td><code>&lt;项目&gt;/.claude/settings.json</code></td><td>该项目所有人（会提交 git）</td></tr>
+            <tr><td>项目本地</td><td><code>&lt;项目&gt;/.claude/settings.local.json</code></td><td>仅你自己，不进 git</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>优先级（高 → 低）</h3>
+      <div class="chain">
+        <div class="row"><span class="rank">1</span><span class="f">managed-settings.json</span><span class="scope">托管策略</span></div>
+        <div class="row"><span class="rank">2</span><span class="f">claude --settings</span><span class="scope">命令行</span></div>
+        <div class="row"><span class="rank">3</span><span class="f">.claude/settings.local.json</span><span class="scope">当前项目 · 仅你</span></div>
+        <div class="row"><span class="rank">4</span><span class="f">.claude/settings.json</span><span class="scope">当前项目 · 共享</span></div>
+        <div class="row top"><span class="rank">5</span><span class="f">~/.claude/settings.json</span><span class="scope">全局 · 优先级最低</span></div>
+      </div>
+      <div class="note"><p><span class="tag">同一个配置项在上层文件里也写了，下层文件里的会被覆盖。</span>比如当前项目里有 <code>.claude/settings.local.json</code>，它会盖掉你写在用户级的配置。</p></div>
+
+      <h3>动手操作</h3>
+      <div class="code"><button class="copy">复制</button><pre><code># 1. 确认目录存在（装完 Claude Code 通常已经有了）
+mkdir -p ~/.claude
+
+# 2. 备份已有配置（如果之前配过）
+cp ~/.claude/settings.json ~/.claude/settings.json.bak 2&gt;/dev/null
+
+# 3. 把仓库里的模板复制过去并改名
+cp settings_example.json ~/.claude/settings.json
+
+# 4. 打开编辑器，把 your_deepseek_api_key_here 换成你自己的 Key
+open -e ~/.claude/settings.json</code></pre></div>
+      <div class="note"><p>在 Finder 里想看到 <code>~/.claude</code> 这个隐藏目录：按 <kbd>⌘</kbd> + <kbd>⇧</kbd> + <kbd>G</kbd>，输入 <code>~/.claude</code> 回车。</p></div>
+    </section>
+
+  </div>
+
+  <!-- ================= Windows ================= -->
+  <div class="panel" id="panel-win" role="tabpanel" aria-labelledby="tab-win">
+
+    <section>
+      <h2><span class="num">0</span>安装 Claude Code</h2>
+      <p>Windows 推荐用<b>原生 PowerShell 安装</b>，比 WSL 省事：</p>
+      <div class="code"><button class="copy">复制</button><pre><code>irm https://claude.ai/install.ps1 | iex</code></pre></div>
+      <p>安装完 <code>claude</code> 会加入 PATH，<b>关掉当前 PowerShell 再开一个新的</b>，然后验证：</p>
+      <div class="code"><button class="copy">复制</button><pre><code>claude --version</code></pre></div>
+      <div class="note warn"><p><span class="tag">如果你用的是 WSL2：</span>请切到上面的「Linux / WSL」标签页。WSL 里跑 Claude Code，配置要走 WSL 内部的 Linux 家目录，和 Windows 的 <code>C:\Users\...</code> 是两套完全独立的文件系统，放错了必然不生效。</p></div>
+    </section>
+
+    <section>
+      <h2><span class="num">4</span>把配置放到正确的目录</h2>
+      <p>这是最容易出错的一步。Claude Code 会从<b>多个位置</b>读取 <code>settings.json</code>，放错地方就会出现「明明配了却不生效」。</p>
+
+      <h3>有效的路径有哪些</h3>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>位置</th><th>Windows 路径</th><th>生效范围</th></tr></thead>
+          <tbody>
+            <tr><td>用户级 ⭐</td><td><code>%USERPROFILE%\.claude\settings.json</code><br><span style="color:var(--faint);font-size:13px">即 <code>C:\Users\你的用户名\.claude\settings.json</code></span></td><td>这台机器上你的<b>所有项目</b></td></tr>
+            <tr><td>项目共享</td><td><code>&lt;项目&gt;\.claude\settings.json</code></td><td>该项目所有人（会提交 git）</td></tr>
+            <tr><td>项目本地</td><td><code>&lt;项目&gt;\.claude\settings.local.json</code></td><td>仅你自己，不进 git</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>优先级（高 → 低）</h3>
+      <div class="chain">
+        <div class="row"><span class="rank">1</span><span class="f">managed-settings.json</span><span class="scope">托管策略</span></div>
+        <div class="row"><span class="rank">2</span><span class="f">claude --settings</span><span class="scope">命令行</span></div>
+        <div class="row"><span class="rank">3</span><span class="f">.claude\settings.local.json</span><span class="scope">当前项目 · 仅你</span></div>
+        <div class="row"><span class="rank">4</span><span class="f">.claude\settings.json</span><span class="scope">当前项目 · 共享</span></div>
+        <div class="row top"><span class="rank">5</span><span class="f">%USERPROFILE%\.claude\settings.json</span><span class="scope">全局 · 优先级最低</span></div>
+      </div>
+      <div class="note"><p><span class="tag">同一个配置项在上层文件里也写了，下层文件里的会被覆盖。</span>比如当前项目里有 <code>.claude\settings.local.json</code>，它会盖掉你写在用户级的配置。</p></div>
+
+      <h3>动手操作（PowerShell）</h3>
+      <div class="code"><button class="copy">复制</button><pre><code># 1. 确认目录存在
+New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.claude"
+
+# 2. 备份已有配置
+if (Test-Path "$env:USERPROFILE\.claude\settings.json") {
+    Copy-Item "$env:USERPROFILE\.claude\settings.json" "$env:USERPROFILE\.claude\settings.json.bak"
+}
+
+# 3. 把仓库里的模板复制过去并改名（先 cd 到本仓库目录）
+Copy-Item ".\settings_example.json" "$env:USERPROFILE\.claude\settings.json"
+
+# 4. 用记事本打开，替换 Key
+notepad "$env:USERPROFILE\.claude\settings.json"</code></pre></div>
+      <div class="note warn">
+        <p><span class="tag">记事本保存时注意两件事：</span></p>
+        <ul style="margin-bottom:0">
+          <li>编码选择 <b>UTF-8</b></li>
+          <li>别把文件存成了 <code>settings.json.txt</code>——在资源管理器「查看」里勾上「文件扩展名」，就能看清真实后缀</li>
+        </ul>
+      </div>
+      <p>想快速进到那个目录：在文件资源管理器地址栏直接输入 <code>%USERPROFILE%\.claude</code> 回车。</p>
+    </section>
+
+  </div>
+
+  <!-- ================= Linux ================= -->
+  <div class="panel" id="panel-linux" role="tabpanel" aria-labelledby="tab-linux">
+
+    <section>
+      <h2><span class="num">0</span>安装 Claude Code</h2>
+      <p>Linux 和 WSL2 的内核环境用法一致，脚本与 macOS 相同：</p>
+      <div class="code"><button class="copy">复制</button><pre><code>curl -fsSL https://claude.ai/install.sh | bash</code></pre></div>
+      <p>或者：</p>
+      <div class="code"><button class="copy">复制</button><pre><code>npm install -g @anthropic-ai/claude-code</code></pre></div>
+      <p>验证：</p>
+      <div class="code"><button class="copy">复制</button><pre><code>claude --version</code></pre></div>
+      <div class="note warn"><p><span class="tag">WSL2 用户注意：</span>配置必须放在 <b>WSL 内部</b>的 <code>/home/你的用户名/.claude/settings.json</code>，不是 Windows 侧 <code>C:\Users\...</code>。在 WSL 里执行 <code>echo $HOME</code> 可以确认家目录到底在哪。</p></div>
+    </section>
+
+    <section>
+      <h2><span class="num">4</span>把配置放到正确的目录</h2>
+      <p>Claude Code 会从<b>多个位置</b>读取 <code>settings.json</code>，放错地方就会出现「明明配了却不生效」。</p>
+
+      <h3>有效的路径有哪些</h3>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>位置</th><th>路径</th><th>生效范围</th></tr></thead>
+          <tbody>
+            <tr><td>用户级 ⭐</td><td><code>~/.claude/settings.json</code></td><td>这台机器上你的<b>所有项目</b></td></tr>
+            <tr><td>项目共享</td><td><code>&lt;项目&gt;/.claude/settings.json</code></td><td>该项目所有人（会提交 git）</td></tr>
+            <tr><td>项目本地</td><td><code>&lt;项目&gt;/.claude/settings.local.json</code></td><td>仅你自己，不进 git</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>优先级（高 → 低）</h3>
+      <div class="chain">
+        <div class="row"><span class="rank">1</span><span class="f">managed-settings.json</span><span class="scope">托管策略</span></div>
+        <div class="row"><span class="rank">2</span><span class="f">claude --settings</span><span class="scope">命令行</span></div>
+        <div class="row"><span class="rank">3</span><span class="f">.claude/settings.local.json</span><span class="scope">当前项目 · 仅你</span></div>
+        <div class="row"><span class="rank">4</span><span class="f">.claude/settings.json</span><span class="scope">当前项目 · 共享</span></div>
+        <div class="row top"><span class="rank">5</span><span class="f">~/.claude/settings.json</span><span class="scope">全局 · 优先级最低</span></div>
+      </div>
+      <div class="note"><p><span class="tag">同一个配置项在上层文件里也写了，下层文件里的会被覆盖。</span>比如当前项目里有 <code>.claude/settings.local.json</code>，它会盖掉你写在用户级的配置。</p></div>
+
+      <h3>动手操作</h3>
+      <div class="code"><button class="copy">复制</button><pre><code># 1. 确认目录存在
+mkdir -p ~/.claude
+
+# 2. 备份已有配置
+cp ~/.claude/settings.json ~/.claude/settings.json.bak 2&gt;/dev/null
+
+# 3. 把仓库里的模板复制过去并改名
+cp settings_example.json ~/.claude/settings.json
+
+# 4. 编辑，把 your_deepseek_api_key_here 换成你自己的 Key
+nano ~/.claude/settings.json</code></pre></div>
+    </section>
+
+  </div>
+
+  <!-- ================= 公共部分 ================= -->
+
+  <section>
+    <h2><span class="num">1</span>注册 DeepSeek 开放平台</h2>
+    <ol>
+      <li>打开 <a href="https://platform.deepseek.com/" target="_blank" rel="noopener">platform.deepseek.com</a></li>
+      <li>点右上角 <b>Sign up / 注册</b>，用<b>邮箱</b>或<b>手机号</b>注册</li>
+      <li>完成邮箱 / 短信验证，登录进控制台</li>
+    </ol>
+    <div class="note warn"><p><span class="tag">别搞混两个站点：</span><a href="https://chat.deepseek.com/" target="_blank" rel="noopener">chat.deepseek.com</a> 是<b>网页版聊天</b>，不提供 API Key；<a href="https://platform.deepseek.com/" target="_blank" rel="noopener">platform.deepseek.com</a> 才是<b>开放平台</b>，API Key 和充值都在这里。</p></div>
+  </section>
+
+  <section>
+    <h2><span class="num">2</span>实名认证与充值</h2>
+    <p>DeepSeek 的 API 是<b>预付费</b>模式：先往账户余额里充钱，再按实际消耗的 Token 从余额扣除。<b>余额为 0 时，即使 Key 是有效的，请求也会返回 <code>402 Payment Required</code>。</b></p>
+    <ol>
+      <li><b>实名认证</b>（如平台提示需要）：右上角头像 → <b>账户设置</b> → <b>实名认证</b>。个人上传身份证，企业上传营业执照，审核通过后状态显示「已通过」。</li>
+      <li><b>充值</b>：右上角头像 → <b>账户余额 / 充值中心</b>。支持支付宝、微信支付、对公银行转账。最低金额与到账时间以页面实时显示为准。</li>
+      <li>充值到账后回到 <b>API Keys</b> 页面，Key 的状态会变成「可用」。</li>
+    </ol>
+    <div class="note"><p>新账号可能有赠送额度，但<b>不要依赖</b>老教程里的具体数字，以你自己的账单页为准。</p></div>
+  </section>
+
+  <section>
+    <h2><span class="num">3</span>创建 API Key</h2>
+    <ol>
+      <li>登录开放平台，左侧导航进入 <b>API Keys</b>：<a href="https://platform.deepseek.com/api_keys" target="_blank" rel="noopener">platform.deepseek.com/api_keys</a></li>
+      <li>点 <b>Create new API key</b></li>
+      <li>起个名字，建议「用途_环境」格式，例如 <code>claude-code-mac</code>、<code>claude-code-win</code></li>
+      <li><b>立刻复制弹出的 Key</b>——它只在弹窗里显示这一次，关掉后平台不再提供明文，只能删掉重建</li>
+    </ol>
+    <p>Key 的格式形如 <code>sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx</code>。</p>
+    <div class="note"><p>给不同设备 / 用途分别建 Key，方便单独吊销和统计用量。泄露了直接在同一页面删除即可。</p></div>
+  </section>
+
+  <section>
+    <h2><span class="num">4.4</span>配置每一项是什么意思</h2>
+    <div class="code"><button class="copy">复制</button><pre><code>{
+  "env": {
+    "ANTHROPIC_AUTH_TOKEN": "your_deepseek_api_key_here",
+    "ANTHROPIC_BASE_URL": "https://api.deepseek.com/anthropic",
+    "ANTHROPIC_DEFAULT_FABLE_MODEL": "deepseek-v4-pro[1M]",
+    "ANTHROPIC_DEFAULT_FABLE_MODEL_NAME": "deepseek-v4-pro",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "deepseek-v4-flash",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "deepseek-v4-pro[1M]",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL_NAME": "deepseek-v4-pro",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "deepseek-v4-pro[1M]",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL_NAME": "deepseek-v4-pro",
+    "ANTHROPIC_MODEL": "deepseek-v4-pro",
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": 1,
+    "API_TIMEOUT_MS": "3000000"
+  },
+  "includeCoAuthoredBy": false,
+  "model": "haiku",
+  "effortLevel": "medium"
+}</code></pre></div>
+
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>键</th><th>作用</th></tr></thead>
+        <tbody>
+          <tr><td><code>ANTHROPIC_AUTH_TOKEN</code></td><td><b>你要改的就是这个。</b>填 DeepSeek 的 API Key，Claude Code 会自动加上 <code>Bearer </code> 前缀</td></tr>
+          <tr><td><code>ANTHROPIC_BASE_URL</code></td><td>把请求指向 DeepSeek 的 Anthropic 兼容端点，而不是 Anthropic 官方</td></tr>
+          <tr><td><code>ANTHROPIC_DEFAULT_<br>OPUS / SONNET / HAIKU_MODEL</code></td><td>分别定义 <code>opus</code> / <code>sonnet</code> / <code>haiku</code> 三个别名实际指向哪个 DeepSeek 模型</td></tr>
+          <tr><td><code>..._MODEL_NAME</code></td><td>界面上显示的名字，纯显示用</td></tr>
+          <tr><td><code>ANTHROPIC_MODEL</code></td><td>默认使用的模型</td></tr>
+          <tr><td><code>CLAUDE_CODE_DISABLE_<br>NONESSENTIAL_TRAFFIC</code></td><td>关掉自动更新、遥测、错误上报等非必要网络请求（走第三方接口时的推荐做法）</td></tr>
+          <tr><td><code>API_TIMEOUT_MS</code></td><td>请求超时（毫秒）。这里设得宽松，避免长回答被提前掐断</td></tr>
+          <tr><td><code>model</code></td><td>默认档位。<code>haiku</code> 即默认走 <code>deepseek-v4-flash</code>（便宜）。想默认用 pro 就改成 <code>"opus"</code> 或 <code>"sonnet"</code></td></tr>
+          <tr><td><code>includeCoAuthoredBy</code></td><td>是否在 git 提交信息里加 Co-Authored-By 署名</td></tr>
+          <tr><td><code>effortLevel</code></td><td>思考 / 努力程度档位</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">5</span>启动并验证</h2>
+    <div class="code"><button class="copy">复制</button><pre><code>claude</code></pre></div>
+    <ol>
+      <li>输入 <code>/status</code>，确认模型和接口地址已经是 DeepSeek 的</li>
+      <li>随便问一句「你好，你是什么模型」测试连通性</li>
+      <li>用 <code>/model</code> 可以在 <code>opus</code> / <code>sonnet</code> / <code>haiku</code> 之间切换</li>
+    </ol>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>报错</th><th>原因与处理</th></tr></thead>
+        <tbody>
+          <tr><td><code>401 authentication_error</code></td><td>Key 填错了，或 Key 和账号不匹配</td></tr>
+          <tr><td><code>402 Insufficient Balance</code></td><td>余额不足，去充值</td></tr>
+          <tr><td><code>404 model not found</code></td><td>模型名写错，对照 <a href="https://api-docs.deepseek.com/" target="_blank" rel="noopener">api-docs.deepseek.com</a> 的最新模型列表</td></tr>
+          <tr><td>一直卡住不返回</td><td>检查网络能否访问 <code>api.deepseek.com</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">6</span>模型对照与费用控制</h2>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Claude Code 档位</th><th>实际调用</th><th>定位</th></tr></thead>
+        <tbody>
+          <tr><td><code>haiku</code></td><td><code>deepseek-v4-flash</code></td><td>便宜、快，适合日常问答和后台任务</td></tr>
+          <tr><td><code>sonnet</code></td><td><code>deepseek-v4-pro[1M]</code></td><td>主力模型，长上下文</td></tr>
+          <tr><td><code>opus</code></td><td><code>deepseek-v4-pro[1M]</code></td><td>主力模型，长上下文</td></tr>
+          <tr><td><code>fable</code></td><td><code>deepseek-v4-pro[1M]</code></td><td>主力模型，长上下文</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <h3>省钱建议</h3>
+    <ul>
+      <li>日常就用 <code>haiku</code>（flash），遇到复杂任务再用 <code>/model</code> 切到 pro</li>
+      <li>在 <a href="https://platform.deepseek.com/usage" target="_blank" rel="noopener">用量页</a>定期查看消耗，设置余额告警</li>
+      <li>不同设备用不同的 Key，方便定位是谁在消耗额度</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2><span class="num">?</span>常见问题</h2>
+
+    <details class="faq">
+      <summary>配好了但完全没生效，还是连的 Anthropic 官方？</summary>
+      <div class="body"><ol style="margin-bottom:0">
+        <li>文件名是不是叫 <code>settings.json</code>（不是 <code>settings_example.json</code>，也不是 <code>settings.json.txt</code>）</li>
+        <li>路径对不对：macOS 是 <code>~/.claude/settings.json</code>，Windows 是 <code>%USERPROFILE%\.claude\settings.json</code></li>
+        <li>JSON 格式是否合法——多一个逗号整个文件就会失效。用 <code>python3 -m json.tool ~/.claude/settings.json</code> 校验</li>
+        <li>是不是被更上层的配置覆盖了，检查当前项目的 <code>.claude/settings.json</code> 和 <code>.claude/settings.local.json</code></li>
+        <li>重启 Claude Code</li>
+      </ol></div>
+    </details>
+
+    <details class="faq">
+      <summary>环境变量和 settings.json 冲突时听谁的？</summary>
+      <div class="body"><p>对 <code>ANTHROPIC_MODEL</code> 这类变量，Claude Code <b>先读环境变量</b>，环境变量没设时才用 <code>settings.json</code> 里的 <code>model</code> 值。而 <code>--model</code> 命令行参数和 <code>/model</code> 命令的优先级又高于 <code>ANTHROPIC_MODEL</code>。如果你之前手动 <code>export</code> 过 <code>ANTHROPIC_*</code>，记得先清掉。</p></div>
+    </details>
+
+    <details class="faq">
+      <summary>想临时切回官方 Claude 模型怎么办？</summary>
+      <div class="body"><p>把 <code>~/.claude/settings.json</code> 改名备份（例如 <code>settings.json.deepseek</code>），需要时再改回来。更干净的做法是：不放用户级，只放在具体项目的 <code>.claude/settings.local.json</code> 里。</p></div>
+    </details>
+
+    <details class="faq">
+      <summary>Windows 上装完 claude 命令找不到？</summary>
+      <div class="body"><p>关掉当前终端窗口重开一个，让 PATH 刷新。如果还不行，检查 <code>%USERPROFILE%\.local\bin</code> 是否在 PATH 中。</p></div>
+    </details>
+
+    <details class="faq">
+      <summary>API Key 安全方面要注意什么？</summary>
+      <div class="body">
+        <ul style="margin-bottom:0">
+          <li>API Key 等同于账号密码：不要提交到 Git、不要贴在截图里、不要发到群里</li>
+          <li>仓库里的 <code>settings_example.json</code> 放的是占位符，<b>保持它是占位符再提交</b></li>
+          <li>想共享配置给团队：把 Key 改成读环境变量，或只写到 <code>.claude/settings.local.json</code>（Claude Code 会自动把它加进全局 gitignore）</li>
+          <li>Key 泄露了立即去 <a href="https://platform.deepseek.com/api_keys" target="_blank" rel="noopener">API Keys 页面</a>删除并重建</li>
+        </ul>
+      </div>
+    </details>
+  </section>
+
+  <footer>
+    <ul>
+      <li>DeepSeek 开放平台 · <a href="https://platform.deepseek.com/" target="_blank" rel="noopener">platform.deepseek.com</a></li>
+      <li>DeepSeek API 文档 · <a href="https://api-docs.deepseek.com/" target="_blank" rel="noopener">api-docs.deepseek.com</a></li>
+      <li>Claude Code 设置文件与优先级 · <a href="https://code.claude.com/docs/en/settings" target="_blank" rel="noopener">code.claude.com/docs/en/settings</a></li>
+      <li>Claude Code 环境变量 · <a href="https://code.claude.com/docs/en/env-vars" target="_blank" rel="noopener">code.claude.com/docs/en/env-vars</a></li>
+    </ul>
+  </footer>
+
+</div>
+
+<script>
+(function () {
+  // ---- 标签页切换 ----
+  var tabs = Array.prototype.slice.call(document.querySelectorAll('.tab'));
+  var panels = Array.prototype.slice.call(document.querySelectorAll('.panel'));
+  var STORE = 'ccds-os-tab';
+
+  function activate(id, focus) {
+    tabs.forEach(function (t) {
+      var on = t.id === 'tab-' + id;
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+      t.tabIndex = on ? 0 : -1;
+      if (on && focus) t.focus();
+    });
+    panels.forEach(function (p) {
+      p.classList.toggle('active', p.id === 'panel-' + id);
+    });
+    try { localStorage.setItem(STORE, id); } catch (e) {}
+  }
+
+  // 依据系统偏好选默认标签
+  function guess() {
+    var saved = null;
+    try { saved = localStorage.getItem(STORE); } catch (e) {}
+    if (saved) return saved;
+    var ua = navigator.userAgent;
+    if (/Win/i.test(ua)) return 'win';
+    if (/Linux/i.test(ua) && !/Android/i.test(ua)) return 'linux';
+    return 'mac';
+  }
+
+  tabs.forEach(function (t) {
+    t.addEventListener('click', function () {
+      activate(t.id.replace('tab-', ''), false);
+    });
+  });
+
+  // 左右方向键在标签间移动
+  document.querySelector('.tabbar').addEventListener('keydown', function (e) {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    var i = tabs.indexOf(document.activeElement);
+    if (i < 0) return;
+    e.preventDefault();
+    var next = tabs[(i + (e.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length];
+    activate(next.id.replace('tab-', ''), true);
+  });
+
+  // 带着 hash 进来时直接跳到对应标签
+  var hash = location.hash.replace('#', '');
+  if (tabs.some(function (t) { return t.id === 'tab-' + hash; })) {
+    activate(hash, false);
+  } else {
+    activate(guess(), false);
+  }
+
+  // ---- 代码复制 ----
+  document.querySelectorAll('.code .copy').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var text = btn.parentNode.querySelector('pre code').innerText;
+      var done = function () {
+        btn.textContent = '已复制';
+        btn.classList.add('done');
+        setTimeout(function () {
+          btn.textContent = '复制';
+          btn.classList.remove('done');
+        }, 1600);
+      };
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(done, fallback);
+      } else {
+        fallback();
+      }
+      function fallback() {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand('copy'); done(); } catch (e) {}
+        document.body.removeChild(ta);
+      }
+    });
+  });
+})();
+</script>
+</body>
+</html>

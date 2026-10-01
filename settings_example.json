@@ -1,6 +1,6 @@
 {
   "env": {
-    "ANTHROPIC_AUTH_TOKEN": "your_deepseek_api_key_here",
+    "ANTHROPIC_AUTH_TOKEN": "your_deepseek_api_key_here", 
     "ANTHROPIC_BASE_URL": "https://api.deepseek.com/anthropic",
     "ANTHROPIC_DEFAULT_FABLE_MODEL": "deepseek-v4-pro[1M]",
     "ANTHROPIC_DEFAULT_FABLE_MODEL_NAME": "deepseek-v4-pro",
